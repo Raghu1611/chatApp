@@ -1,0 +1,15 @@
+node_modules
+.env
+.env.local
+.env.production
+dist
+uploads
+*.log
+.DS_Store
+.vercel
+backend/node_modules
+backend/.env
+backend/uploads
+frontend/node_modules
+frontend/.env
+frontend/dist
