@@ -96,7 +96,8 @@ export default function Home() {
         });
 
         s.on('message:new', ({ chatId, message }) => {
-          if (active && chatId === active._id) {
+          const currentActive = activeRef.current;
+          if (currentActive && chatId === currentActive._id) {
             setMessages((prev) => [...prev, message]);
             if (document.visibilityState === 'visible') {
               s.emit('message:read', { messageId: message._id, chatId });
@@ -119,7 +120,8 @@ export default function Home() {
         });
 
         s.on('message:read', ({ messageId, userId, chatId }) => {
-          if (active && chatId === active._id) {
+          const currentActive = activeRef.current;
+          if (currentActive && chatId === currentActive._id) {
             setMessages(prev => prev.map(m => {
               if (m._id === messageId && !m.readBy.includes(userId)) {
                 return { ...m, readBy: [...m.readBy, userId] };
@@ -130,7 +132,8 @@ export default function Home() {
         });
 
         s.on('message:delivered', ({ messageId, userId, chatId }) => {
-          if (active && chatId === active._id) {
+          const currentActive = activeRef.current;
+          if (currentActive && chatId === currentActive._id) {
             setMessages(prev => prev.map(m => {
               if (m._id === messageId && !m.deliveredTo?.includes(userId)) {
                 return { ...m, deliveredTo: [...(m.deliveredTo || []), userId] };
@@ -183,13 +186,10 @@ export default function Home() {
             setLastSeenMap(prev => ({ ...prev, [userId]: lastSeen }));
           }
         });
-        s.on('message:read', ({ messageId, chatId }) => {
-          if (active && chatId === active._id) {
-            setMessages(prev => prev.map(m => m._id === messageId ? { ...m, readBy: [...m.readBy, 'read'] } : m));
-          }
-        });
+
         s.on('message:react', ({ messageId, userId, emoji, chatId }) => {
-          if (active && chatId === active._id) {
+          const currentActive = activeRef.current;
+          if (currentActive && chatId === currentActive._id) {
             setMessages(prev => prev.map(m => {
               if (m._id === messageId) {
                 const reactions = m.reactions || [];
@@ -1040,22 +1040,38 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* Message Actions (Hover) */}
+                      {/* Combined Message Actions & Reactions Picker */}
                       {!m.isDeleted && (
-                        <div className={`absolute top-0 ${isMe ? '-left-20' : '-right-20'} hidden group-hover:flex items-center gap-1 bg-white dark:bg-slate-800 shadow-md rounded-lg p-1`}>
-                          <button onClick={() => setReplyTo(m)} className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded text-gray-500 dark:text-gray-400" title="Reply">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
-                          </button>
-                          {isMe && canEdit(m) && (
-                            <button onClick={() => startEditMessage(m)} className="p-1 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded text-blue-500" title="Edit">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        <div className={`absolute top-0 ${isMe ? '-left-auto right-full mr-2' : '-right-auto left-full ml-2'} hidden group-hover:flex items-center gap-2 bg-white dark:bg-slate-800 shadow-md rounded-full p-1 border border-gray-100 dark:border-slate-700 z-10`}>
+                          {/* Reaction Picker */}
+                          <div className="flex items-center gap-1 border-r border-gray-200 dark:border-slate-600 pr-2 mr-1">
+                            {['❤️', '👍', '😂', '😮', '😢'].map(emoji => (
+                              <button
+                                key={emoji}
+                                onClick={() => reactToMessage(m._id, emoji)}
+                                className="w-7 h-7 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full flex items-center justify-center text-lg transition transform hover:scale-110"
+                              >
+                                {emoji}
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Actions */}
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => setReplyTo(m)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full text-gray-500 dark:text-gray-400 transition" title="Reply">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
                             </button>
-                          )}
-                          {isMe && (
-                            <button onClick={() => openDeleteModal(m)} className="p-1 hover:bg-red-50 dark:hover:bg-red-900/30 rounded text-red-500" title="Delete">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                            </button>
-                          )}
+                            {isMe && canEdit(m) && (
+                              <button onClick={() => startEditMessage(m)} className="p-1.5 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-full text-blue-500 transition" title="Edit">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                              </button>
+                            )}
+                            {isMe && (
+                              <button onClick={() => openDeleteModal(m)} className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-full text-red-500 transition" title="Delete">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       )}
 
@@ -1068,19 +1084,6 @@ export default function Home() {
                           <span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium">{m.reactions.length}</span>
                         </div>
                       )}
-
-                      {/* Reaction Picker */}
-                      <div className={`absolute top-1/2 -translate-y-1/2 ${isMe ? '-left-24' : '-right-24'} opacity-0 group-hover:opacity-100 transition-opacity bg-white dark:bg-slate-800 shadow-lg rounded-full p-1 flex items-center gap-1 border border-gray-100 dark:border-slate-700`}>
-                        {['❤️', '👍', '😂', '😮', '😢'].map(emoji => (
-                          <button
-                            key={emoji}
-                            onClick={() => reactToMessage(m._id, emoji)}
-                            className="w-7 h-7 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full flex items-center justify-center text-lg transition"
-                          >
-                            {emoji}
-                          </button>
-                        ))}
-                      </div>
                     </div>
                   </div>
                 );
@@ -1440,8 +1443,8 @@ export default function Home() {
               <button
                 onClick={() => setSettingsTab('profile')}
                 className={`flex-1 px-6 py-3 font-medium transition ${settingsTab === 'profile'
-                    ? 'text-green-600 border-b-2 border-green-600 bg-green-50 dark:bg-green-900/20'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'
+                  ? 'text-green-600 border-b-2 border-green-600 bg-green-50 dark:bg-green-900/20'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'
                   }`}
               >
                 Profile
@@ -1449,8 +1452,8 @@ export default function Home() {
               <button
                 onClick={() => setSettingsTab('password')}
                 className={`flex-1 px-6 py-3 font-medium transition ${settingsTab === 'password'
-                    ? 'text-green-600 border-b-2 border-green-600 bg-green-50 dark:bg-green-900/20'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'
+                  ? 'text-green-600 border-b-2 border-green-600 bg-green-50 dark:bg-green-900/20'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-slate-700'
                   }`}
               >
                 Password
